@@ -1,0 +1,296 @@
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { Activity, CheckCircle, Clock, AlertTriangle, Eye, Edit, Trash2, X, FileText, Save, Search } from 'lucide-react';
+
+const ListaEquipos = ({ darkMode }) => {
+  const [equipos, setEquipos] = useState([]);
+  const [busqueda, setBusqueda] = useState('');
+  
+  // Estados para el Modal de VER
+  const [equipoSeleccionado, setEquipoSeleccionado] = useState(null);
+  const [modalAbierto, setModalAbierto] = useState(false);
+
+  // Estados para el Modal de EDITAR
+  const [equipoEditando, setEquipoEditando] = useState(null);
+  const [modalEditarAbierto, setModalEditarAbierto] = useState(false);
+
+  const cargarEquipos = async () => {
+    try {
+      const res = await axios.get('http://localhost:3001/api/instrumentos');
+      setEquipos(res.data);
+    } catch (err) {
+      console.error("Error al cargar equipos:", err);
+    }
+  };
+
+  useEffect(() => {
+    cargarEquipos();
+    const intervalo = setInterval(cargarEquipos, 5000);
+    return () => clearInterval(intervalo);
+  }, []);
+
+  const cambiarEstatus = async (id, nuevoEstatus) => {
+    try {
+      await axios.put(`http://localhost:3001/api/instrumentos/${id}/estatus`, { estatus: nuevoEstatus });
+      cargarEquipos();
+    } catch (err) {
+      alert("Error al actualizar estatus");
+    }
+  };
+
+  const eliminarEquipo = async (id) => {
+    if(window.confirm("¿Estás seguro de que deseas eliminar este registro?")) {
+      try {
+        await axios.delete(`http://localhost:3001/api/instrumentos/${id}`);
+        cargarEquipos();
+      } catch (err) {
+        alert("Error al eliminar");
+      }
+    }
+  };
+
+  // Funciones Modal VER
+  const abrirModalVer = (equipo) => {
+    setEquipoSeleccionado(equipo);
+    setModalAbierto(true);
+  };
+  const cerrarModalVer = () => {
+    setModalAbierto(false);
+    setEquipoSeleccionado(null);
+  };
+
+  // Funciones Modal EDITAR
+  const abrirModalEditar = (equipo) => {
+    setEquipoEditando({ ...equipo }); // Hacemos una copia para editar sin afectar la tabla original
+    setModalEditarAbierto(true);
+  };
+  const cerrarModalEditar = () => {
+    setModalEditarAbierto(false);
+    setEquipoEditando(null);
+  };
+
+  // Función para GUARDAR los cambios de edición
+  const guardarEdicion = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.put(`http://localhost:3001/api/instrumentos/${equipoEditando.id}`, equipoEditando);
+      alert("✅ Equipo actualizado correctamente");
+      cerrarModalEditar();
+      cargarEquipos(); // Recargamos la tabla
+    } catch (err) {
+      alert("Error al guardar los cambios: " + err.message);
+    }
+  };
+
+  const estatusConfig = {
+    'Recepción': { color: 'bg-gray-100 text-gray-700', icon: <Clock size={14} /> },
+    'Laboratorio': { color: 'bg-blue-100 text-blue-700', icon: <Activity size={14} /> },
+    'Certificación': { color: 'bg-purple-100 text-purple-700', icon: <AlertTriangle size={14} /> },
+    'Listo': { color: 'bg-emerald-100 text-emerald-700', icon: <CheckCircle size={14} /> },
+    'Entregado': { color: 'bg-green-100 text-green-700', icon: <CheckCircle size={14} /> }
+  };
+
+  const getOsaColor = (osStr, isDark) => {
+    if (!osStr) return isDark ? '#141f0b' : '#fff';
+    let hash = 0;
+    for (let i = 0; i < osStr.length; i++) {
+        hash = osStr.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash) % 360;
+    return isDark ? `hsl(${hue}, 40%, 20%)` : `hsl(${hue}, 70%, 95%)`;
+  };
+
+  const equiposFiltrados = equipos.filter(eq => 
+    eq.folio_rastreo?.toLowerCase().includes(busqueda.toLowerCase()) ||
+    eq.orden_cotizacion?.toLowerCase().includes(busqueda.toLowerCase()) ||
+    eq.nombre_instrumento?.toLowerCase().includes(busqueda.toLowerCase()) ||
+    eq.marca?.toLowerCase().includes(busqueda.toLowerCase()) ||
+    eq.no_serie?.toLowerCase().includes(busqueda.toLowerCase()) ||
+    eq.empresa?.toLowerCase().includes(busqueda.toLowerCase()) ||
+    eq.cliente?.toLowerCase().includes(busqueda.toLowerCase())
+  );
+
+  return (
+    <div className={`w-full mt-8 p-6 rounded-2xl shadow-xl border relative transition-colors ${darkMode ? 'bg-[#141f0b] border-[#C9EA63]/20' : 'bg-white border-gray-100'}`}>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className={`text-xl font-bold ${darkMode ? 'text-[#C9EA63]' : 'text-slate-800'}`}>Panel de Trazabilidad (Órdenes de Servicio)</h2>
+        <span className={`text-sm ${darkMode ? 'text-[#F2F6F0]/70' : 'text-slate-500'}`}>Total: {equipos.length} equipos</span>
+      </div>
+
+      <div className={`mb-6 flex items-center gap-2 w-full max-w-md px-4 py-2 border rounded-xl ${darkMode ? 'bg-[#2a401c] border-[#C9EA63]/20 text-[#F2F6F0]' : 'bg-slate-50 border-gray-200 text-slate-800'}`}>
+        <Search size={18} className={darkMode ? 'text-[#F2F6F0]/50' : 'text-slate-400'} />
+        <input
+          type="text"
+          placeholder="Buscar por O.S, serie, instrumento o cliente..."
+          className="bg-transparent border-none outline-none w-full text-sm"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+        />
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className={`text-sm border-b ${darkMode ? 'bg-[#2a401c] text-[#F2F6F0] border-[#C9EA63]/20' : 'bg-slate-50 text-slate-600 border-gray-200'}`}>
+              <th className="p-4 font-semibold">O.S. / Folio</th>
+              <th className="p-4 font-semibold">Instrumento / Marca</th>
+              <th className="p-4 font-semibold">Cliente</th>
+              <th className="p-4 font-semibold">Estatus Actual</th>
+              <th className="p-4 font-semibold text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {equiposFiltrados.length === 0 ? (
+              <tr>
+                <td colSpan="5" className={`p-6 text-center ${darkMode ? 'text-[#F2F6F0]/50' : 'text-gray-500'}`}>
+                    {equipos.length === 0 ? 'No hay equipos registrados aún.' : 'No hay resultados para la búsqueda.'}
+                </td>
+              </tr>
+            ) : (
+              equiposFiltrados.map((eq) => (
+                <tr key={eq.id} style={{ backgroundColor: getOsaColor(eq.orden_cotizacion || eq.folio_rastreo, darkMode) }} className={`border-b transition-colors ${darkMode ? 'border-[#C9EA63]/10 hover:brightness-125' : 'border-gray-100 hover:brightness-95'}`}>
+                  <td className={`p-4 font-mono text-sm font-bold ${darkMode ? 'text-[#65d067]' : 'text-blue-600'}`}>{eq.folio_rastreo || eq.orden_cotizacion}</td>
+                  <td className="p-4">
+                    <p className={`font-semibold ${darkMode ? 'text-[#F2F6F0]' : 'text-slate-800'}`}>{eq.nombre_instrumento}</p>
+                    <p className={`text-xs ${darkMode ? 'text-[#F2F6F0]/60' : 'text-slate-500'}`}>S/N: {eq.no_serie} • {eq.marca}</p>
+                  </td>
+                  <td className={`p-4 text-sm ${darkMode ? 'text-[#F2F6F0]/80' : 'text-slate-700'}`}>{eq.empresa || eq.cliente}</td>
+                  
+                  <td className="p-4">
+                    <select 
+                      value={eq.estatus_actual}
+                      onChange={(e) => cambiarEstatus(eq.id, e.target.value)}
+                      className={`text-sm rounded-full px-3 py-1 font-bold outline-none cursor-pointer appearance-none text-center ${estatusConfig[eq.estatus_actual]?.color || 'bg-gray-100 text-gray-700'}`}
+                    >
+                      <option value="Recepción">Recepción</option>
+                      <option value="Laboratorio">Laboratorio</option>
+                      <option value="Certificación">Certificación</option>
+                      <option value="Listo">Listo</option>
+                      <option value="Entregado">Entregado</option>
+                    </select>
+                  </td>
+
+                  <td className="p-4 flex justify-center gap-3">
+                    <button onClick={() => abrirModalVer(eq)} className={`transition-colors ${darkMode ? 'text-gray-400 hover:text-[#C9EA63]' : 'text-gray-400 hover:text-blue-600'}`} title="Ver Expediente">
+                      <Eye size={18} />
+                    </button>
+                    {/* AQUI CONECTAMOS EL BOTON EDITAR */}
+                    <button onClick={() => abrirModalEditar(eq)} className={`transition-colors ${darkMode ? 'text-gray-400 hover:text-yellow-400' : 'text-gray-400 hover:text-yellow-500'}`} title="Editar">
+                      <Edit size={18} />
+                    </button>
+                    <button onClick={() => eliminarEquipo(eq.id)} className={`transition-colors ${darkMode ? 'text-gray-400 hover:text-red-400' : 'text-gray-400 hover:text-red-600'}`} title="Eliminar">
+                      <Trash2 size={18} />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* --- MODAL 1: VER EXPEDIENTE --- */}
+      {modalAbierto && equipoSeleccionado && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-[100]">
+          <div className={`p-8 rounded-2xl shadow-2xl w-full max-w-lg relative border-t-4 ${darkMode ? 'bg-[#141f0b] border-[#C9EA63]' : 'bg-white border-blue-600'}`}>
+            <button onClick={cerrarModalVer} className={`absolute top-4 right-4 ${darkMode ? 'text-gray-400 hover:text-[#C9EA63]' : 'text-gray-400 hover:text-gray-800'}`}>
+              <X size={24} />
+            </button>
+            <h2 className={`text-2xl font-bold mb-6 flex items-center gap-2 ${darkMode ? 'text-[#F2F6F0]' : 'text-slate-800'}`}>
+              <FileText className={darkMode ? 'text-[#C9EA63]' : 'text-blue-600'} /> Expediente del Equipo
+            </h2>
+            <div className="space-y-4">
+              <div className={`p-4 rounded-lg ${darkMode ? 'bg-[#2a401c]' : 'bg-slate-50'}`}>
+                <p className={`text-sm uppercase font-bold ${darkMode ? 'text-[#C9EA63]' : 'text-gray-500'}`}>Orden de Servicio / Ref.</p>
+                <p className={`text-xl font-mono font-bold ${darkMode ? 'text-[#F2F6F0]' : 'text-blue-700'}`}>{equipoSeleccionado.folio_rastreo || equipoSeleccionado.orden_cotizacion}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><p className={`text-sm font-semibold ${darkMode ? 'text-[#F2F6F0]/60' : 'text-gray-500'}`}>Instrumento</p><p className={`font-medium ${darkMode ? 'text-[#F2F6F0]' : 'text-slate-800'}`}>{equipoSeleccionado.nombre_instrumento}</p></div>
+                <div><p className={`text-sm font-semibold ${darkMode ? 'text-[#F2F6F0]/60' : 'text-gray-500'}`}>Marca</p><p className={`font-medium ${darkMode ? 'text-[#F2F6F0]' : 'text-slate-800'}`}>{equipoSeleccionado.marca}</p></div>
+                <div><p className={`text-sm font-semibold ${darkMode ? 'text-[#F2F6F0]/60' : 'text-gray-500'}`}>No. de Serie</p><p className={`font-medium ${darkMode ? 'text-[#F2F6F0]' : 'text-slate-800'}`}>{equipoSeleccionado.no_serie}</p></div>
+                <div><p className={`text-sm font-semibold ${darkMode ? 'text-[#F2F6F0]/60' : 'text-gray-500'}`}>Cliente / Empresa</p><p className={`font-medium ${darkMode ? 'text-[#F2F6F0]' : 'text-slate-800'}`}>{equipoSeleccionado.empresa || equipoSeleccionado.cliente}</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL 2: EDITAR EQUIPO --- */}
+      {modalEditarAbierto && equipoEditando && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-[100]">
+          <div className={`p-8 rounded-2xl shadow-2xl w-full max-w-lg relative border-t-4 ${darkMode ? 'bg-[#141f0b] border-yellow-400' : 'bg-white border-yellow-500'}`}>
+            <button onClick={cerrarModalEditar} className={`absolute top-4 right-4 ${darkMode ? 'text-gray-400 hover:text-yellow-400' : 'text-gray-400 hover:text-gray-800'}`}>
+              <X size={24} />
+            </button>
+            <h2 className={`text-2xl font-bold mb-6 flex items-center gap-2 ${darkMode ? 'text-[#F2F6F0]' : 'text-slate-800'}`}>
+              <Edit className={darkMode ? 'text-yellow-400' : 'text-yellow-500'} /> Editar Registro
+            </h2>
+            
+            <form onSubmit={guardarEdicion} className="space-y-4">
+              <div>
+                <label className={`block text-sm font-semibold mb-1 ${darkMode ? 'text-[#F2F6F0]/80' : 'text-gray-600'}`}>Orden de Servicio</label>
+                <input 
+                  type="text" 
+                  value={equipoEditando.orden_cotizacion || equipoEditando.folio_rastreo} 
+                  onChange={(e) => setEquipoEditando({...equipoEditando, orden_cotizacion: e.target.value.toUpperCase()})}
+                  className={`w-full p-2 border rounded focus:ring-2 focus:ring-yellow-500 outline-none font-mono ${darkMode ? 'bg-[#2a401c] border-[#C9EA63]/20 text-[#F2F6F0]' : 'border-gray-300 text-slate-800'}`}
+                  required
+                />
+              </div>
+              <div>
+                <label className={`block text-sm font-semibold mb-1 ${darkMode ? 'text-[#F2F6F0]/80' : 'text-gray-600'}`}>Instrumento</label>
+                <input 
+                  type="text" 
+                  value={equipoEditando.nombre_instrumento} 
+                  onChange={(e) => setEquipoEditando({...equipoEditando, nombre_instrumento: e.target.value})}
+                  className={`w-full p-2 border rounded focus:ring-2 focus:ring-yellow-500 outline-none ${darkMode ? 'bg-[#2a401c] border-[#C9EA63]/20 text-[#F2F6F0]' : 'border-gray-300 text-slate-800'}`}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={`block text-sm font-semibold mb-1 ${darkMode ? 'text-[#F2F6F0]/80' : 'text-gray-600'}`}>Marca</label>
+                  <input 
+                    type="text" 
+                    value={equipoEditando.marca} 
+                    onChange={(e) => setEquipoEditando({...equipoEditando, marca: e.target.value})}
+                    className={`w-full p-2 border rounded focus:ring-2 focus:ring-yellow-500 outline-none ${darkMode ? 'bg-[#2a401c] border-[#C9EA63]/20 text-[#F2F6F0]' : 'border-gray-300 text-slate-800'}`}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm font-semibold mb-1 ${darkMode ? 'text-[#F2F6F0]/80' : 'text-gray-600'}`}>No. Serie</label>
+                  <input 
+                    type="text" 
+                    value={equipoEditando.no_serie} 
+                    onChange={(e) => setEquipoEditando({...equipoEditando, no_serie: e.target.value})}
+                    className={`w-full p-2 border rounded focus:ring-2 focus:ring-yellow-500 outline-none ${darkMode ? 'bg-[#2a401c] border-[#C9EA63]/20 text-[#F2F6F0]' : 'border-gray-300 text-slate-800'}`}
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className={`block text-sm font-semibold mb-1 ${darkMode ? 'text-[#F2F6F0]/80' : 'text-gray-600'}`}>Empresa</label>
+                <input 
+                  type="text" 
+                  value={equipoEditando.empresa} 
+                  onChange={(e) => setEquipoEditando({...equipoEditando, empresa: e.target.value})}
+                  className={`w-full p-2 border rounded focus:ring-2 focus:ring-yellow-500 outline-none ${darkMode ? 'bg-[#2a401c] border-[#C9EA63]/20 text-[#F2F6F0]' : 'border-gray-300 text-slate-800'}`}
+                  required
+                />
+              </div>
+
+              <button type="submit" className={`w-full mt-4 font-bold py-3 px-4 rounded-lg flex justify-center items-center gap-2 transition-colors ${darkMode ? 'bg-yellow-500 hover:bg-yellow-400 text-[#141f0b]' : 'bg-yellow-500 hover:bg-yellow-600 text-white'}`}>
+                <Save size={20} /> Guardar Cambios
+              </button>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+};
+
+export default ListaEquipos;

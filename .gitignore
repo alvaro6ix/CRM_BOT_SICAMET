@@ -1,0 +1,36 @@
+# Dependencias de Node
+node_modules/
+.npm
+
+# Variables de entorno (DATOS SENSIBLES - NUNCA subir)
+.env
+.env.local
+.env.production
+backend/.env
+
+# Sesiones de WhatsApp (se regeneran con QR)
+backend/.wwebjs_auth/
+backend/.wwebjs_cache/
+
+# Archivos build del frontend
+frontend/dist/
+
+# Archivos temporales del sistema
+.DS_Store
+Thumbs.db
+*.log
+logs/
+
+# Archivos temporales de importación / pruebas
+backend/inspect_excel.js
+backend/test_norm.js
+uploads/
+
+# Caché de Vite
+frontend/.vite/
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
